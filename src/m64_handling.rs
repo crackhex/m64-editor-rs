@@ -23,11 +23,76 @@ pub(crate) struct M64File {
     pub rsp_plugin: [AsciiChar; 64],        //0x1E2 64 bytes
     pub author: [AsciiChar; 222],           //0x222 220 bytes
     pub movie_desc: [AsciiChar; 256],       //0x300 256 bytes
-    pub inputs: Vec<u8>,                   //0x400
+    pub inputs: Vec<InputLayout>,                   //0x400
+}
+
+pub(crate) struct InputLayout {
+    pub r_dpad: bool,
+    pub l_dpad: bool,
+    pub d_dpad: bool,
+    pub u_dpad: bool,
+    pub start: bool,
+    pub z_trig: bool,
+    pub b_button: bool,
+    pub a_button: bool,
+    pub c_right: bool,
+    pub c_left: bool,
+    pub c_down: bool,
+    pub c_up: bool,
+    pub r_trig: bool,
+    pub l_trig: bool,
+    pub x: i8,
+    pub y: i8,
+}
+
+impl InputLayout {
+    fn parse_inputs(inputs: &Vec<u8>) -> Vec<InputLayout> {
+        let mut input_layouts: Vec<InputLayout> = vec![];
+        for i in (0..inputs.len()).step_by(4) {
+            let input = u32::from_le_bytes(inputs[i..i+4].try_into().unwrap());
+            let c_right = (input | 0x0001) != 0;
+            let c_left = (input | 0x0002) != 0;
+            let c_down = (input | 0x0004) != 0;
+            let c_up = (input | 0x0008) != 0;
+            let r_trig = (input | 0x0010) != 0;
+            let l_trig = (input | 0x0020) != 0;
+            let r_dpad = (input | 0x0100) != 0;
+            let l_dpad = (input | 0x0200) != 0;
+            let d_dpad = (input | 0x0400) != 0;
+            let u_dpad = (input | 0x0800) != 0;
+            let start = (input | 0x1000) != 0;
+            let z_trig = (input | 0x2000) != 0;
+            let b_button = (input | 0x4000) != 0;
+            let a_button = (input | 0x8000) != 0;
+
+
+            let x = 0; // TODO: Implement x and y
+            let y = 0;
+            input_layouts.push(InputLayout {
+                r_dpad,
+                l_dpad,
+                d_dpad,
+                u_dpad,
+                start,
+                z_trig,
+                b_button,
+                a_button,
+                c_right,
+                c_left,
+                c_down,
+                c_up,
+                r_trig,
+                l_trig,
+                x,
+                y,
+            });
+        }
+        input_layouts
+    }
 }
 
 impl M64File {
-    fn new<'a>() -> M64File {
+    fn new() -> M64File {
         M64File {
             signature: [0x4D, 0x36, 0x34, 0x1A],
             version: 0x03,
@@ -79,9 +144,11 @@ impl M64File {
             rsp_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x1E2..0x222])?.as_ascii().unwrap(),
             author: *<&[u8] as TryInto<[u8; 222]>>::try_into(&buffer[0x222..0x300])?.as_ascii().unwrap(),
             movie_desc: *<&[u8] as TryInto<[u8; 256]>>::try_into(&buffer[0x300..0x400])?.as_ascii().unwrap(),
-            inputs: buffer[0x400..].to_vec(),
+            inputs: InputLayout::parse_inputs(&buffer[0x400..].to_vec()),
         };
+
         Ok(m64)
+
     }
 }
 
