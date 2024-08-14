@@ -1,4 +1,5 @@
 use std::array::TryFromSliceError;
+use std::ascii::Char as AsciiChar;
 use std::fs::File;
 use std::io::Read;
 
@@ -16,8 +17,7 @@ impl M64File {
     }
     pub fn build_m64(f: &mut File) -> Result<M64File, TryFromSliceError> {
         let mut m64 = M64File::new();
-        let header = M64Header::build_header(f)?;
-        m64.header = header;
+        m64.header = M64Header::build_header(f)?;
         Ok(m64)
     }
 }
@@ -36,16 +36,16 @@ pub(crate) struct M64Header {
     pub unused2: u16,               //0x1E UNUSED
     pub controller_flags: u32,      //0x20
     pub unused3: [u8; 160],         //0x24 UNUSED 160 bytes
-    pub internal_name: String,    //0xC4 32 bytes
+    pub internal_name: [AsciiChar; 32],    //0xC4 32 bytes
     pub crc32: u32,                 //0xE4
     pub country_code: u16,          //0xE8
     pub unused4: [u8; 56],          //0xEA UNUSED 56 bytes
-    pub video_plugin: String,     //0x122 64 bytes
-    pub sound_plugin: String,     //0x162 64 bytes
-    pub input_plugin: String,     //0x1A2 64 bytes
-    pub rsp_plugin: String,       //0x1E2 64 bytes
-    pub author: String,          //0x222 220 bytes
-    pub movie_desc: String,      //0x2FE 256 bytes
+    pub video_plugin: [AsciiChar; 64],     //0x122 64 bytes
+    pub sound_plugin: [AsciiChar; 64],     //0x162 64 bytes
+    pub input_plugin: [AsciiChar; 64],     //0x1A2 64 bytes
+    pub rsp_plugin: [AsciiChar; 64],       //0x1E2 64 bytes
+    pub author: [AsciiChar; 222],          //0x222 220 bytes
+    pub movie_desc: [AsciiChar; 256],      //0x300 256 bytes
 }
 
 impl M64Header {
@@ -64,19 +64,19 @@ impl M64Header {
             unused2: 0,
             controller_flags: 0,
             unused3: [0; 160],
-            internal_name: "".to_string(),
+            internal_name: [0_u8.as_ascii().unwrap(); 32],
             crc32: 0,
             country_code: 0,
             unused4: [0; 56],
-            video_plugin: "".to_string(),
-            sound_plugin: "".to_string(),
-            input_plugin: "".to_string(),
-            rsp_plugin: "".to_string(),
-            author: "".to_string(),
-            movie_desc: "".to_string(),
+            video_plugin: [0_u8.as_ascii().unwrap(); 64],
+            sound_plugin: [0_u8.as_ascii().unwrap(); 64],
+            input_plugin: [0_u8.as_ascii().unwrap(); 64],
+            rsp_plugin: [0_u8.as_ascii().unwrap(); 64],
+            author: [0_u8.as_ascii().unwrap(); 222],
+            movie_desc: [0_u8.as_ascii().unwrap(); 256],
         }
     }
-    fn build_header(f: &mut File) -> Result<M64Header, (TryFromSliceError)> {
+    fn build_header(f: &mut File) -> Result<M64Header, TryFromSliceError> {
         let mut buffer: [u8; 1024] = [0; 1024];
         f.read(&mut buffer[..]).expect("TODO: panic message");
         let header = M64Header {
@@ -93,16 +93,16 @@ impl M64Header {
             unused2: u16::from_le_bytes(buffer[0x1E..0x20].try_into()?),
             controller_flags: u32::from_le_bytes(buffer[0x20..0x24].try_into()?),
             unused3: buffer[0x24..0xC4].try_into()?,
-            internal_name:  std::str::from_utf8(buffer[0xC4..0xE4].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
+            internal_name: *<&[u8] as TryInto<[u8; 32]>>::try_into(&buffer[0xC4..0xE4])?.as_ascii().unwrap(),
             crc32: u32::from_le_bytes(buffer[0xE4..0xE8].try_into()?),
             country_code: u16::from_le_bytes(buffer[0xE8..0xEA].try_into()?),
-            unused4: <&[u8] as TryInto<[u8;56]>>::try_into(&buffer[0xEA..0x122])?,
-            video_plugin:  std::str::from_utf8(buffer[0x122..0x162].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),//buffer[0x122..0x162].try_into()?,
-            sound_plugin: std::str::from_utf8(buffer[0x162..0x1A2].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
-            input_plugin:std::str::from_utf8(buffer[0x1A2..0x1E2].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
-            rsp_plugin: std::str::from_utf8(buffer[0x1E2..0x222].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
-            author: std::str::from_utf8(buffer[0x222..0x300].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
-            movie_desc: std::str::from_utf8(buffer[0x300..0x400].try_into()?).expect("invalid utf-8 sequence").parse().unwrap(),
+            unused4: buffer[0xEA..0x122].try_into()?,
+            video_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x122..0x162])?.as_ascii().unwrap(),
+            sound_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x162..0x1A2])?.as_ascii().unwrap(),
+            input_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x1A2..0x1E2])?.as_ascii().unwrap(),
+            rsp_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x1E2..0x222])?.as_ascii().unwrap(),
+            author: *<&[u8] as TryInto<[u8; 222]>>::try_into(&buffer[0x222..0x300])?.as_ascii().unwrap(),
+            movie_desc: *<&[u8] as TryInto<[u8; 256]>>::try_into(&buffer[0x300..0x400])?.as_ascii().unwrap(),
         };
         Ok(header)
 
