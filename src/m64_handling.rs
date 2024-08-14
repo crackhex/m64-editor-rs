@@ -1,36 +1,12 @@
+use std::array::TryFromSliceError;
 use std::fs::File;
 use std::io::Read;
 
 pub(crate) struct M64File {
-    header: M64Header,
-    inputs: i32,
+    pub header: M64Header,
+    pub inputs: i32,
 }
-#[derive(Debug)]
-struct M64Header {
-    signature: [u8; 4],            //0x00 4 bytes
-    version: u32,               //0x04
-    movie_uid: i32,             //0x08
-    movie_length: u32,          //0x0C
-    rerecord_count: u32,        //0x10
-    vi_per_second: u8,          //0x14 UNUSED
-    num_controllers: u8,        //0x15
-    unused1: u16,               //0x16 UNUSED
-    num_samples: u32,           //0x18
-    movie_start_type: u16,      //0x1C
-    unused2: u16,               //0x1E UNUSED
-    controller_flags: u32,      //0x20
-    unused3: [u8; 160],              //0x24 UNUSED 160 bytes
-    internal_name: [u8; 32],         //0xC4 32 bytes
-    crc32: u32,                 //0xE4
-    country_code: u16,          //0xE8
-    unused4: [u8; 56],              //0xEA UNUSED 56 bytes
-    video_plugin: [u8; 64],         //0x122 64 bytes
-    sound_plugin: [u8; 64],     //0x162 64 bytes
-    input_plugin: [u8; 64],     //0x1A2 64 bytes
-    rsp_plugin: [u8; 64],       //0x1E2 64 bytes
-    author: [u8; 222],          //0x222 220 bytes
-    movie_desc: [u8; 256],      //0x2FE 256 bytes
-}
+
 impl M64File {
     fn new() -> M64File {
         M64File {
@@ -38,12 +14,54 @@ impl M64File {
             inputs: 0,
         }
     }
-    pub(crate) fn build_m64(f: &mut File) -> M64File {
+    pub fn build_m64(f: &mut File) -> Result<M64File, TryFromSliceError> {
         let mut m64 = M64File::new();
-        let mut header = M64Header::build_header(f);
+        let mut header = M64Header::build_header(f)?;
         m64.header = header;
-        println!("{:?}", &m64.header.author);
-        m64
+        Ok(m64)
+    }
+}
+
+pub(crate) struct M64Header {
+    pub signature: [u8; 4],         //0x00 4 bytes
+    pub version: u32,               //0x04
+    pub movie_uid: i32,             //0x08
+    pub movie_length: u32,          //0x0C
+    pub rerecord_count: u32,        //0x10
+    pub vi_per_second: u8,          //0x14 UNUSED
+    pub num_controllers: u8,        //0x15
+    pub unused1: u16,               //0x16 UNUSED
+    pub num_samples: u32,           //0x18
+    pub movie_start_type: u16,      //0x1C
+    pub unused2: u16,               //0x1E UNUSED
+    pub controller_flags: u32,      //0x20
+    pub unused3: [u8; 160],         //0x24 UNUSED 160 bytes
+    pub internal_name: [u8; 32],    //0xC4 32 bytes
+    pub crc32: u32,                 //0xE4
+    pub country_code: u16,          //0xE8
+    pub unused4: [u8; 56],          //0xEA UNUSED 56 bytes
+    pub video_plugin: [u8; 64],     //0x122 64 bytes
+    pub sound_plugin: [u8; 64],     //0x162 64 bytes
+    pub input_plugin: [u8; 64],     //0x1A2 64 bytes
+    pub rsp_plugin: [u8; 64],       //0x1E2 64 bytes
+    pub author: [u8; 222],          //0x222 220 bytes
+    pub movie_desc: [u8; 256],      //0x2FE 256 bytes
+}
+
+pub trait BytesToAscii {
+    fn bytes_to_ascii(f: &[u8]) -> String;
+    fn ascii_to_bytes(f: &String)-> &[u8];
+
+}
+
+impl BytesToAscii for M64Header {
+    fn bytes_to_ascii(f:&[u8]) -> String {
+        let str = std::str::from_utf8(f).expect("invalid utf-8 sequence");
+        str.parse().unwrap()
+    }
+    fn ascii_to_bytes(f: &String) -> &[u8] {
+        let bytes = f.as_bytes();
+        bytes
     }
 }
 
@@ -76,36 +94,37 @@ impl M64Header {
             movie_desc: [0; 256],
         }
     }
-
-    fn build_header(f: &mut File) -> M64Header {
+    fn build_header(f: &mut File) -> Result<M64Header, TryFromSliceError> {
         let mut buffer: [u8; 1024] = [0; 1024];
-        f.read(&mut buffer).expect("TODO: panic message");
-        let mut header = M64Header {
-            signature: buffer[0x0..0x4].try_into().expect("TODO: panic message"),
-            version: u32::from_le_bytes(buffer[0x4..0x8].try_into().expect("TODO: panic message")),
-            movie_uid: i32::from_le_bytes(buffer[0x8..0xC].try_into().expect("TODO: panic message")),
-            movie_length: u32::from_le_bytes(buffer[0xC..0x10].try_into().expect("TODO: panic message")),
-            rerecord_count: u32::from_le_bytes(buffer[0x10..0x14].try_into().expect("TODO: panic message")),
+        f.read(&mut buffer[..]).expect("TODO: panic message");
+        let header = M64Header {
+            signature: buffer[0x0..0x4].try_into()?,
+            version: u32::from_le_bytes(buffer[0x4..0x8].try_into()?),
+            movie_uid: i32::from_le_bytes(buffer[0x8..0xC].try_into()?),
+            movie_length: u32::from_le_bytes(buffer[0xC..0x10].try_into()?),
+            rerecord_count: u32::from_le_bytes(buffer[0x10..0x14].try_into()?),
             vi_per_second: buffer[0x14],
             num_controllers: buffer[0x15],
-            unused1: u16::from_le_bytes(buffer[0x16..0x18].try_into().expect("TODO: panic message")),
-            num_samples: u32::from_le_bytes(buffer[0x18..0x1C].try_into().expect("TODO: panic message")),
-            movie_start_type: u16::from_le_bytes(buffer[0x1C..0x1E].try_into().expect("TODO: panic message")),
-            unused2: u16::from_le_bytes(buffer[0x1E..0x20].try_into().expect("TODO: panic message")),
-            controller_flags: u32::from_le_bytes(buffer[0x20..0x24].try_into().expect("TODO: panic message")),
-            unused3: buffer[0x24..0xC4].try_into().expect("TODO: panic message"),
-            internal_name: buffer[0xC4..0xE4].try_into().expect("TODO: panic message"),
-            crc32: u32::from_le_bytes(buffer[0xE4..0xE8].try_into().expect("TODO: panic message")),
-            country_code: u16::from_le_bytes(buffer[0xE8..0xEA].try_into().expect("TODO: panic message")),
-            unused4: buffer[0xEA..0x122].try_into().expect("TODO: panic message"),
-            video_plugin:  buffer[0x122..0x162].try_into().expect("TODO: panic message"),
-            sound_plugin: buffer[0x162..0x1A2].try_into().expect("TODO: panic message"),
-            input_plugin: buffer[0x1A2..0x1E2].try_into().expect("TODO: panic message"),
-            rsp_plugin: buffer[0x1E2..0x222].try_into().expect("TODO: panic message"),
-            author: buffer[0x222..0x300].try_into().expect("TODO: panic message"),
-            movie_desc: buffer[0x300..1024].try_into().expect("TODO: panic message"),
+            unused1: u16::from_le_bytes(buffer[0x16..0x18].try_into()?),
+            num_samples: u32::from_le_bytes(buffer[0x18..0x1C].try_into()?),
+            movie_start_type: u16::from_le_bytes(buffer[0x1C..0x1E].try_into()?),
+            unused2: u16::from_le_bytes(buffer[0x1E..0x20].try_into()?),
+            controller_flags: u32::from_le_bytes(buffer[0x20..0x24].try_into()?),
+            unused3: buffer[0x24..0xC4].try_into()?,
+            internal_name: buffer[0xC4..0xE4].try_into()?,
+            crc32: u32::from_le_bytes(buffer[0xE4..0xE8].try_into()?),
+            country_code: u16::from_le_bytes(buffer[0xE8..0xEA].try_into()?),
+            unused4: <&[u8] as TryInto<[u8;56]>>::try_into(&buffer[0xEA..0x122])?,
+            video_plugin:  buffer[0x122..0x162].try_into()?,
+            sound_plugin: buffer[0x162..0x1A2].try_into()?,
+            input_plugin: buffer[0x1A2..0x1E2].try_into()?,
+            rsp_plugin: buffer[0x1E2..0x222].try_into()?,
+            author: buffer[0x222..0x300].try_into()?,
+            movie_desc: buffer[0x300..1024].try_into()?,
         };
-        header
+        Ok(header)
+
     }
 }
+
 
