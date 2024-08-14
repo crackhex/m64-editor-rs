@@ -16,7 +16,7 @@ impl M64File {
     }
     pub fn build_m64(f: &mut File) -> Result<M64File, TryFromSliceError> {
         let mut m64 = M64File::new();
-        let mut header = M64Header::build_header(f)?;
+        let header = M64Header::build_header(f)?;
         m64.header = header;
         Ok(m64)
     }

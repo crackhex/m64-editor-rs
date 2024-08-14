@@ -2,7 +2,7 @@ mod m64_handling;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use crate::m64_handling::{M64File, bytes_to_ascii};
+use crate::m64_handling::{M64File};
 
 fn open_file(path: &str) -> io::Result<File> {
     let f = File::open(path)?;
