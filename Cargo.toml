@@ -1,0 +1,9 @@
+[package]
+name = "m64_editor"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+#iced = { git = "https://github.com/iced-rs/iced.git", features = ["tokio", "highlighter", "debug"]}
+tokio = {version = "1.39.2", features = ["fs"]}
+#rfd = "0.14"
