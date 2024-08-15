@@ -2,6 +2,7 @@ use std::array::TryFromSliceError;
 use std::ascii::Char as AsciiChar;
 use std::fs::File;
 use std::io::Read;
+use std::ops::{Shr};
 
 pub(crate) struct M64File {
     pub signature: [u8; 4],                 //0x00 4 bytes
@@ -48,43 +49,25 @@ pub(crate) struct InputLayout {
 impl InputLayout {
     fn parse_inputs(inputs: &Vec<u8>) -> Vec<InputLayout> {
         let mut input_layouts: Vec<InputLayout> = vec![];
-        for i in (0..inputs.len()).step_by(4) {
+        for i in (0..inputs.len()-4).step_by(4) {
             let input = u32::from_le_bytes(inputs[i..i+4].try_into().unwrap());
-            let c_right = (input | 0x0001) != 0;
-            let c_left = (input | 0x0002) != 0;
-            let c_down = (input | 0x0004) != 0;
-            let c_up = (input | 0x0008) != 0;
-            let r_trig = (input | 0x0010) != 0;
-            let l_trig = (input | 0x0020) != 0;
-            let r_dpad = (input | 0x0100) != 0;
-            let l_dpad = (input | 0x0200) != 0;
-            let d_dpad = (input | 0x0400) != 0;
-            let u_dpad = (input | 0x0800) != 0;
-            let start = (input | 0x1000) != 0;
-            let z_trig = (input | 0x2000) != 0;
-            let b_button = (input | 0x4000) != 0;
-            let a_button = (input | 0x8000) != 0;
-
-
-            let x = 0; // TODO: Implement x and y
-            let y = 0;
             input_layouts.push(InputLayout {
-                r_dpad,
-                l_dpad,
-                d_dpad,
-                u_dpad,
-                start,
-                z_trig,
-                b_button,
-                a_button,
-                c_right,
-                c_left,
-                c_down,
-                c_up,
-                r_trig,
-                l_trig,
-                x,
-                y,
+                r_dpad: (input & 0x01) != 0,
+                l_dpad: (input & 0x02) != 0,
+                d_dpad: (input & 0x04) != 0,
+                u_dpad: (input & 0x08) != 0,
+                start: (input & 0x10) != 0,
+                z_trig: (input & 0x20) != 0,
+                b_button: (input & 0x40) != 0,
+                a_button: (input & 0x80) != 0,
+                c_right: (input & 0x100) != 0,
+                c_left: (input & 0x200) != 0,
+                c_down: (input & 0x400) != 0,
+                c_up: (input & 0x800) != 0,
+                r_trig: (input & 0x1000) != 0,
+                l_trig: (input & 0x2000) != 0,
+                x: input.shr(16) as i8,
+                y: input.shr(24) as i8,
             });
         }
         input_layouts
