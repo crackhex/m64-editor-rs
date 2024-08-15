@@ -199,8 +199,6 @@ impl M64File {
         let mut samples: Vec<u8> = Input::samples_to_bytes(inputs, &active_controllers);
         let file_size = 0x400 + samples.len();
         let mut buffer: Vec<u8> = vec![0; file_size];
-
-        let length = inputs[active_controllers[0]].len();
         buffer[0x0..0x4].copy_from_slice(&self.signature);
         buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());
         buffer[0x8..0xC].copy_from_slice(&self.uid.to_le_bytes());
