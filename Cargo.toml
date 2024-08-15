@@ -8,3 +8,4 @@ edition = "2024"
 [dependencies]
 #iced = { git = "https://github.com/iced-rs/iced.git", features = ["tokio", "highlighter", "debug"]}
 tokio = {version = "1.39.2", features = ["fs"]}
+bitvec = "1.0.1"
