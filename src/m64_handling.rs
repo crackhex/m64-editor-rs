@@ -1,7 +1,7 @@
 use std::array::TryFromSliceError;
 use std::ascii::Char as AsciiChar;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::ops::{Shr};
 use bitvec::prelude::*;
 
@@ -48,15 +48,29 @@ pub(crate) struct Input {
 }
 
 impl Input {
+    fn new() -> Input {
+        Input {
+            r_dpad: false,
+            l_dpad: false,
+            d_dpad: false,
+            u_dpad: false,
+            start: false,
+            z_trig: false,
+            b_button: false,
+            a_button: false,
+            c_right: false,
+            c_left: false,
+            c_down: false,
+            c_up: false,
+            r_trig: false,
+            l_trig: false,
+            x: 0,
+            y: 0,
+        }
+    }
     fn parse_inputs(input_bytes: &Vec<u8>, controller_flags: u8) -> [Vec<Input>; 4] {
         let mut inputs: [Vec<Input>; 4] = [const { Vec::new() }; 4];
-        let mut active_controllers = vec![];
-        let controllers: BitArray<u8>= controller_flags.into_bitarray();
-        for i in 0..4 {
-            if controllers[i] {
-                active_controllers.push(i);
-            }
-        };
+        let mut active_controllers = M64File::active_controllers(controller_flags as u32).unwrap();
         for i in (0..input_bytes.len()-4).step_by(4) {
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
             let current_controller = active_controllers[i % active_controllers.len()];
@@ -80,6 +94,34 @@ impl Input {
             });
         }
         inputs
+    }
+    pub fn samples_to_bytes(inputs: &[Vec<Self>; 4], active_controllers: &Vec<usize>) -> Vec<u8> {
+        let mut input_bytes: Vec<u8> = vec![];
+        let size = inputs[active_controllers[0]].len() * active_controllers.len();
+        for i in 0..size {
+            let current_controller = active_controllers[i % active_controllers.len()];
+            let frame = i.div_floor(active_controllers.len());
+            let input = &inputs[current_controller][frame];
+            let mut input_byte: u32 = 0;
+            input_byte |= input.r_dpad as u32;
+            input_byte |= (input.l_dpad as u32) << 1;
+            input_byte |= (input.d_dpad as u32) << 2;
+            input_byte |= (input.u_dpad as u32) << 3;
+            input_byte |= (input.start as u32) << 4;
+            input_byte |= (input.z_trig as u32) << 5;
+            input_byte |= (input.b_button as u32) << 6;
+            input_byte |= (input.a_button as u32) << 7;
+            input_byte |= (input.c_right as u32) << 8;
+            input_byte |= (input.c_left as u32) << 9;
+            input_byte |= (input.c_down as u32) << 10;
+            input_byte |= (input.c_up as u32) << 11;
+            input_byte |= (input.r_trig as u32) << 12;
+            input_byte |= (input.l_trig as u32) << 13;
+            input_byte |= (input.x as u32) << 16;
+            input_byte |= (input.y as u32) << 24;
+            input_bytes.extend_from_slice(&input_byte.to_le_bytes());
+        }
+        input_bytes
     }
 }
 
@@ -114,10 +156,8 @@ impl M64File {
             panic!("File is too small to be a valid M64 file");
         }
         let mut buffer: Vec<u8> = vec![0; m64_len];
-
         f.read(&mut buffer[..]).expect("TODO: panic message");
-
-        let mut m64 = M64File {
+        let m64 = M64File {
             signature: buffer[0x0..0x4].try_into()?,
             version: u32::from_le_bytes(buffer[0x4..0x8].try_into()?),
             uid: i32::from_le_bytes(buffer[0x8..0xC].try_into()?),
@@ -142,6 +182,46 @@ impl M64File {
 
         Ok(m64)
 
+    }
+    pub fn active_controllers(controller_flags: u32) -> Option<Vec<usize>> {
+        let mut active_controllers: Vec<usize> = vec![];
+        let controllers: BitArray<u32>= controller_flags.into_bitarray();
+        for i in 0..4 {
+            if controllers[i] {
+                active_controllers.push(i);
+            }
+        };
+        Some(active_controllers)
+    }
+    pub fn save_m64(&self, f: &mut File) {
+        let inputs = &self.inputs;
+        let active_controllers = Self::active_controllers(self.controller_flags).unwrap();
+        let mut samples: Vec<u8> = Input::samples_to_bytes(inputs, &active_controllers);
+        let file_size = 0x400 + samples.len();
+        let mut buffer: Vec<u8> = vec![0; file_size];
+
+        let length = inputs[active_controllers[0]].len();
+        buffer[0x0..0x4].copy_from_slice(&self.signature);
+        buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());
+        buffer[0x8..0xC].copy_from_slice(&self.uid.to_le_bytes());
+        buffer[0xC..0x10].copy_from_slice(&self.vi_count.to_le_bytes());
+        buffer[0x10..0x14].copy_from_slice(&self.rerecord_count.to_le_bytes());
+        buffer[0x14] = self.vi_per_second;
+        buffer[0x15] = self.controller_count;
+        buffer[0x18..0x1C].copy_from_slice(&self.num_samples.to_le_bytes());
+        buffer[0x1C..0x1E].copy_from_slice(&self.movie_start_type.to_le_bytes());
+        buffer[0x20..0x24].copy_from_slice(&self.controller_flags.to_le_bytes());
+        buffer[0xC4..0xE4].copy_from_slice(&self.internal_name.as_bytes());
+        buffer[0xE4..0xE8].copy_from_slice(&self.crc32.to_le_bytes());
+        buffer[0xE8..0xEA].copy_from_slice(&self.country_code.to_le_bytes());
+        buffer[0x122..0x162].copy_from_slice(&self.video_plugin.as_bytes());
+        buffer[0x162..0x1A2].copy_from_slice(&self.sound_plugin.as_bytes());
+        buffer[0x1A2..0x1E2].copy_from_slice(&self.input_plugin.as_bytes());
+        buffer[0x1E2..0x222].copy_from_slice(&self.rsp_plugin.as_bytes());
+        buffer[0x222..0x300].copy_from_slice(&self.author.as_bytes());
+        buffer[0x300..0x400].copy_from_slice(&self.movie_desc.as_bytes());
+        buffer[0x400..].copy_from_slice(&samples);
+        // TODO: Write buffer to file
     }
 }
 
