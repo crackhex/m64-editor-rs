@@ -1,10 +1,11 @@
 use std::array::TryFromSliceError;
 use std::ascii::Char as AsciiChar;
-use std::fs::File;
-use std::io::{Read, Write};
 use std::ops::{Shr};
-use std::path::Path;
-use bitvec::prelude::*;
+use bitvec::prelude::BitArray;
+use bitvec::view::BitViewSized;
+
+pub type ControllerInput = Vec<Input>;
+pub type ByteVec = Vec<u8>;
 
 pub struct M64File {
     pub signature: [u8; 4],                 //0x00 4 bytes
@@ -26,7 +27,7 @@ pub struct M64File {
     pub rsp_plugin: [AsciiChar; 64],        //0x1E2 64 bytes
     pub author: [AsciiChar; 222],           //0x222 220 bytes
     pub movie_desc: [AsciiChar; 256],       //0x300 256 bytes
-    pub inputs: [Vec<Input>; 4],            //0x400
+    pub inputs: [ControllerInput; 4],            //0x400
 }
 
 pub struct Input {
@@ -69,8 +70,8 @@ impl Input {
             y: 0,
         }
     }
-    fn parse_inputs(input_bytes: &Vec<u8>, controller_flags: u8) -> [Vec<Input>; 4] {
-        let mut inputs: [Vec<Input>; 4] = [const { Vec::new() }; 4];
+    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> [ControllerInput; 4] {
+        let mut inputs: [ControllerInput; 4] = [const { Vec::new() }; 4];
         let mut active_controllers = M64File::active_controllers(controller_flags as u32).expect("TODO: panic message");
         for i in (0..input_bytes.len()).step_by(4) {
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
@@ -96,10 +97,11 @@ impl Input {
         }
         inputs
     }
-    pub fn samples_to_bytes(inputs: &[Vec<Self>; 4], active_controllers: &Vec<usize>) -> Vec<u8> {
+
+    pub(crate) fn samples_to_bytes(inputs: &[ControllerInput; 4], active_controllers: &Vec<usize>) -> ByteVec {
 
         let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
-        let mut input_bytes: Vec<u8> = vec![0; size*4*active_controllers.len()];
+        let mut input_bytes: ByteVec = vec![0; size*4*active_controllers.len()];
         for i in 0..size {
             let current_controller = active_controllers[i % active_controllers.len()];
             let frame = i.div_floor(active_controllers.len());
@@ -152,34 +154,31 @@ impl M64File {
             inputs: [const { Vec::new() }; 4],
         }
     }
-    pub fn build_m64(f: &mut File) -> Result<M64File, TryFromSliceError> {
-        let m64_len = f.metadata().unwrap().len() as usize;
-        if m64_len < 0x400 {
+    pub fn from_bytes(buf: &ByteVec) -> Result<M64File, TryFromSliceError> {
+        if buf.len() < 0x400 {
             panic!("File is too small to be a valid M64 file");
         }
-        let mut buffer: Vec<u8> = vec![0; m64_len];
-        f.read(&mut buffer[..]).expect("TODO: panic message");
         let m64 = M64File {
-            signature: buffer[0x0..0x4].try_into()?,
-            version: u32::from_le_bytes(buffer[0x4..0x8].try_into()?),
-            uid: i32::from_le_bytes(buffer[0x8..0xC].try_into()?),
-            vi_count: u32::from_le_bytes(buffer[0xC..0x10].try_into()?),
-            rerecord_count: u32::from_le_bytes(buffer[0x10..0x14].try_into()?),
-            vi_per_second: buffer[0x14],
-            controller_count: buffer[0x15],
-            num_samples: u32::from_le_bytes(buffer[0x18..0x1C].try_into()?),
-            movie_start_type: u16::from_le_bytes(buffer[0x1C..0x1E].try_into()?),
-            controller_flags: u32::from_le_bytes(buffer[0x20..0x24].try_into()?),
-            internal_name: *<&[u8] as TryInto<[u8; 32]>>::try_into(&buffer[0xC4..0xE4])?.as_ascii().unwrap(),
-            crc32: u32::from_le_bytes(buffer[0xE4..0xE8].try_into()?),
-            country_code: u16::from_le_bytes(buffer[0xE8..0xEA].try_into()?),
-            video_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x122..0x162])?.as_ascii().unwrap(),
-            sound_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x162..0x1A2])?.as_ascii().unwrap(),
-            input_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x1A2..0x1E2])?.as_ascii().unwrap(),
-            rsp_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buffer[0x1E2..0x222])?.as_ascii().unwrap(),
-            author: *<&[u8] as TryInto<[u8; 222]>>::try_into(&buffer[0x222..0x300])?.as_ascii().unwrap(),
-            movie_desc: *<&[u8] as TryInto<[u8; 256]>>::try_into(&buffer[0x300..0x400])?.as_ascii().unwrap(),
-            inputs: Input::parse_inputs(&buffer[0x400..].to_vec(), buffer[0x20]),
+            signature: buf[0x0..0x4].try_into()?,
+            version: u32::from_le_bytes(buf[0x4..0x8].try_into()?),
+            uid: i32::from_le_bytes(buf[0x8..0xC].try_into()?),
+            vi_count: u32::from_le_bytes(buf[0xC..0x10].try_into()?),
+            rerecord_count: u32::from_le_bytes(buf[0x10..0x14].try_into()?),
+            vi_per_second: buf[0x14],
+            controller_count: buf[0x15],
+            num_samples: u32::from_le_bytes(buf[0x18..0x1C].try_into()?),
+            movie_start_type: u16::from_le_bytes(buf[0x1C..0x1E].try_into()?),
+            controller_flags: u32::from_le_bytes(buf[0x20..0x24].try_into()?),
+            internal_name: *<&[u8] as TryInto<[u8; 32]>>::try_into(&buf[0xC4..0xE4])?.as_ascii().unwrap(),
+            crc32: u32::from_le_bytes(buf[0xE4..0xE8].try_into()?),
+            country_code: u16::from_le_bytes(buf[0xE8..0xEA].try_into()?),
+            video_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buf[0x122..0x162])?.as_ascii().unwrap(),
+            sound_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buf[0x162..0x1A2])?.as_ascii().unwrap(),
+            input_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buf[0x1A2..0x1E2])?.as_ascii().unwrap(),
+            rsp_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buf[0x1E2..0x222])?.as_ascii().unwrap(),
+            author: *<&[u8] as TryInto<[u8; 222]>>::try_into(&buf[0x222..0x300])?.as_ascii().unwrap(),
+            movie_desc: *<&[u8] as TryInto<[u8; 256]>>::try_into(&buf[0x300..0x400])?.as_ascii().unwrap(),
+            inputs: Input::parse(&buf[0x400..].to_vec(), buf[0x20]),
         };
 
         Ok(m64)
@@ -195,15 +194,12 @@ impl M64File {
         };
         Some(active_controllers)
     }
-    pub fn save_m64(&self, path: &Path) -> std::io::Result<(File)>{
+    pub fn to_bytes(&self) -> ByteVec {
         let inputs = &self.inputs;
 
         let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
-        println!("{:?}", inputs[active_controllers[0]][1921].y);
-        let mut sample_bytes: Vec<u8> = Input::samples_to_bytes(inputs, &active_controllers);
-        println!("{:#x}", &sample_bytes[147*4+3]);
-        let file_size = 0x400 + sample_bytes.len();
-        let mut buffer: Vec<u8> = vec![0; file_size];
+        let mut sample_bytes: ByteVec = Input::samples_to_bytes(inputs, &active_controllers);
+        let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
         buffer[0x0..0x4].copy_from_slice(&self.signature);
         buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());
         buffer[0x8..0xC].copy_from_slice(&self.uid.to_le_bytes());
@@ -224,9 +220,7 @@ impl M64File {
         buffer[0x222..0x300].copy_from_slice(&self.author.as_bytes());
         buffer[0x300..0x400].copy_from_slice(&self.movie_desc.as_bytes());
         buffer[0x400..].copy_from_slice(&sample_bytes);
-        let mut file = File::create(path)?;
-        file.write_all(&buffer)?;
-        Ok(file)
+        buffer
     }
 }
 
