@@ -6,7 +6,7 @@ use std::ops::{Shr};
 use std::path::Path;
 use bitvec::prelude::*;
 
-pub(crate) struct M64File {
+pub struct M64File {
     pub signature: [u8; 4],                 //0x00 4 bytes
     pub version: u32,                       //0x04
     pub uid: i32,                           //0x08
@@ -29,7 +29,7 @@ pub(crate) struct M64File {
     pub inputs: [Vec<Input>; 4],            //0x400
 }
 
-pub(crate) struct Input {
+pub struct Input {
     pub r_dpad: bool,
     pub l_dpad: bool,
     pub d_dpad: bool,
