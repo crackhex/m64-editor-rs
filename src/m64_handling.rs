@@ -3,6 +3,7 @@ use std::ascii::Char as AsciiChar;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::ops::{Shr};
+use std::path::Path;
 use bitvec::prelude::*;
 
 pub(crate) struct M64File {
@@ -70,8 +71,8 @@ impl Input {
     }
     fn parse_inputs(input_bytes: &Vec<u8>, controller_flags: u8) -> [Vec<Input>; 4] {
         let mut inputs: [Vec<Input>; 4] = [const { Vec::new() }; 4];
-        let mut active_controllers = M64File::active_controllers(controller_flags as u32).unwrap();
-        for i in (0..input_bytes.len()-4).step_by(4) {
+        let mut active_controllers = M64File::active_controllers(controller_flags as u32).expect("TODO: panic message");
+        for i in (0..input_bytes.len()).step_by(4) {
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
             let current_controller = active_controllers[i % active_controllers.len()];
             inputs[current_controller].push(Input {
@@ -96,8 +97,9 @@ impl Input {
         inputs
     }
     pub fn samples_to_bytes(inputs: &[Vec<Self>; 4], active_controllers: &Vec<usize>) -> Vec<u8> {
-        let mut input_bytes: Vec<u8> = vec![];
-        let size = inputs[active_controllers[0]].len() * active_controllers.len();
+
+        let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
+        let mut input_bytes: Vec<u8> = vec![0; size*4*active_controllers.len()];
         for i in 0..size {
             let current_controller = active_controllers[i % active_controllers.len()];
             let frame = i.div_floor(active_controllers.len());
@@ -117,9 +119,9 @@ impl Input {
             input_byte |= (input.c_up as u32) << 11;
             input_byte |= (input.r_trig as u32) << 12;
             input_byte |= (input.l_trig as u32) << 13;
-            input_byte |= (input.x as u32) << 16;
-            input_byte |= (input.y as u32) << 24;
-            input_bytes.extend_from_slice(&input_byte.to_le_bytes());
+            input_byte |= ((input.x  as u8) as u32) << 16;
+            input_byte |= ((input.y as u8) as u32) << 24;
+            input_bytes[i*4..i*4+4].copy_from_slice(&input_byte.to_le_bytes());
         }
         input_bytes
     }
@@ -193,11 +195,14 @@ impl M64File {
         };
         Some(active_controllers)
     }
-    pub fn save_m64(&self, f: &mut File) {
+    pub fn save_m64(&self, path: &Path) -> std::io::Result<(File)>{
         let inputs = &self.inputs;
-        let active_controllers = Self::active_controllers(self.controller_flags).unwrap();
-        let mut samples: Vec<u8> = Input::samples_to_bytes(inputs, &active_controllers);
-        let file_size = 0x400 + samples.len();
+
+        let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
+        println!("{:?}", inputs[active_controllers[0]][1921].y);
+        let mut sample_bytes: Vec<u8> = Input::samples_to_bytes(inputs, &active_controllers);
+        println!("{:#x}", &sample_bytes[147*4+3]);
+        let file_size = 0x400 + sample_bytes.len();
         let mut buffer: Vec<u8> = vec![0; file_size];
         buffer[0x0..0x4].copy_from_slice(&self.signature);
         buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());
@@ -218,8 +223,10 @@ impl M64File {
         buffer[0x1E2..0x222].copy_from_slice(&self.rsp_plugin.as_bytes());
         buffer[0x222..0x300].copy_from_slice(&self.author.as_bytes());
         buffer[0x300..0x400].copy_from_slice(&self.movie_desc.as_bytes());
-        buffer[0x400..].copy_from_slice(&samples);
-        // TODO: Write buffer to file
+        buffer[0x400..].copy_from_slice(&sample_bytes);
+        let mut file = File::create(path)?;
+        file.write_all(&buffer)?;
+        Ok(file)
     }
 }
 

@@ -1,32 +1,25 @@
 #![feature(ascii_char)]
+#![feature(int_roundings)]
 extern crate core;
 
 mod m64_handling;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use std::path::Path;
 use crate::m64_handling::{M64File};
 
-fn open_file(path: &str) -> io::Result<File> {
-    let f = File::open(path)?;
-    Ok(f)
+fn open_file(path: &Path) -> io::Result<File> {
+    Ok(File::open(path)?)
 }
 
 pub fn main() -> io::Result<()>{
-    let m64_path = "PATH\\TO\\M64";
-    let m64_name = "gogg";
-    let m64_file_path = format!("{}\\{}.m64", m64_path, m64_name);
-    let mut file = open_file(&m64_file_path)?;
-    let m64 = M64File::build_m64(&mut file);
-    match m64 {
-        Ok(m64) => {
-            println!("{:?}", m64.internal_name);
-        },
-        Err(e) => {
-            println!("{:?}", e);
-        }
-    }
-   // let internal_name = &m64.header.internal_name;
-   // println!("{:?}", internal_name);
+    let input_path = "Path\\To\\Input.m64";
+    let m64_input_path = Path::new(input_path);
+    let output_path  ="Path\\To\\Output.m64";
+    let m64_output_path = Path::new(output_path);
+    let m64 = M64File::build_m64(&mut open_file(m64_input_path)?).unwrap();
+    m64.save_m64(m64_output_path).expect("TODO: panic message");
     Ok(())
+
 }
