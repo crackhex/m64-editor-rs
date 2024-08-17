@@ -52,6 +52,7 @@ impl From<std::io::Error> for M64Error {
     }
 }
 
+#[derive(Clone)]
 pub struct Input {
     pub r_dpad: bool,
     pub l_dpad: bool,
@@ -250,7 +251,16 @@ impl M64File {
         }
         Ok(self)
     }
-
+    pub fn add_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File, M64Error> {
+        let active_controllers = Self::active_controllers(self.controller_flags)?;
+        for i in 0..active_controllers.len() {
+            let inputs = &mut self.inputs[active_controllers[i]];
+            let end = inputs.split_off(range.start);
+            inputs.extend_from_slice(&vec![Input::new(); range.end - range.start][..]);
+            inputs.extend_from_slice(&end);
+        }
+        Ok(self)
+    }
 }
 
 
