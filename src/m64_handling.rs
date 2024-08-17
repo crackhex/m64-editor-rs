@@ -7,6 +7,7 @@ use bitvec::view::BitViewSized;
 pub type Controllers = [Vec<Input>; 4];
 pub type ByteVec = Vec<u8>;
 
+
 pub struct M64File {
     pub signature: [u8; 4],                 //0x00 4 bytes
     pub version: u32,                       //0x04
@@ -28,6 +29,27 @@ pub struct M64File {
     pub author: [AsciiChar; 222],           //0x222 220 bytes
     pub movie_desc: [AsciiChar; 256],       //0x300 256 bytes
     pub inputs: Controllers,            //0x400
+}
+
+#[derive(Debug)]
+pub struct M64Error {
+    message: String,
+}
+
+impl From<TryFromSliceError> for M64Error {
+    fn from(error: TryFromSliceError) -> Self {
+        M64Error {
+            message: error.to_string(),
+        }
+    }
+}
+
+impl From<std::io::Error> for M64Error {
+    fn from(error: std::io::Error) -> Self {
+        M64Error {
+            message: error.to_string(),
+        }
+    }
 }
 
 pub struct Input {
@@ -70,9 +92,9 @@ impl Input {
             y: 0,
         }
     }
-    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> Controllers {
+    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> Result<Controllers, M64Error> {
         let mut inputs: Controllers = [const { Vec::new() }; 4];
-        let mut active_controllers = M64File::active_controllers(controller_flags as u32).expect("TODO: panic message");
+        let mut active_controllers = M64File::active_controllers(controller_flags as u32)?;
         for i in (0..input_bytes.len()).step_by(4) {
 
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
@@ -96,10 +118,10 @@ impl Input {
                 y: input.shr(24) as i8,
             });
         }
-        inputs
+        Ok(inputs)
     }
 
-    pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> ByteVec {
+    pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> Result<ByteVec, M64Error> {
 
         let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
         let mut input_bytes: ByteVec = vec![0; size*4];
@@ -126,7 +148,7 @@ impl Input {
             input_byte |= ((input.y as u8) as u32) << 24;
             input_bytes[i*4..i*4+4].copy_from_slice(&input_byte.to_le_bytes());
         }
-        input_bytes
+        Ok(input_bytes)
     }
 }
 
@@ -155,9 +177,9 @@ impl M64File {
             inputs: [const { Vec::new() }; 4],
         }
     }
-    pub fn from_bytes(buf: &ByteVec) -> Result<M64File, TryFromSliceError> {
+    pub fn from_bytes(buf: &ByteVec) -> Result<M64File, M64Error> {
         if buf.len() < 0x400 {
-            panic!("File is too small to be a valid M64 file");
+            Err(M64Error { message: "File is too small".to_string() })?;
         }
         let m64 = M64File {
             signature: buf[0x0..0x4].try_into()?,
@@ -179,23 +201,25 @@ impl M64File {
             rsp_plugin: *<&[u8] as TryInto<[u8; 64]>>::try_into(&buf[0x1E2..0x222])?.as_ascii().unwrap(),
             author: *<&[u8] as TryInto<[u8; 222]>>::try_into(&buf[0x222..0x300])?.as_ascii().unwrap(),
             movie_desc: *<&[u8] as TryInto<[u8; 256]>>::try_into(&buf[0x300..0x400])?.as_ascii().unwrap(),
-            inputs: Input::parse(&buf[0x400..].to_vec(), buf[0x20]),
+            inputs: Input::parse(&buf[0x400..].to_vec(), buf[0x20])?,
         };
 
         Ok(m64)
 
     }
-    pub fn active_controllers(controller_flags: u32) -> Option<Vec<usize>> {
+    pub fn active_controllers(controller_flags: u32) -> Result<Vec<usize>, M64Error> {
         // Returns a vector with the indices of the active controllers,
         // e.g., if controller 1, 2, and 4 are enabled, it will return [1, 2, 4]
         let mut controllers: BitArray<u32>= controller_flags.into_bitarray();
         let active_controllers: Vec<usize> = (0..4).filter(|&i| controllers[i]).collect();
-        Option::from((!active_controllers.is_empty()).then_some(active_controllers))
+        Result::from((!active_controllers.is_empty()).
+            then_some(active_controllers).
+            ok_or(M64Error { message: "No active controllers found".to_string() }))
 
     }
-    pub fn to_bytes(&self) -> ByteVec {
+    pub fn to_bytes(&self) -> Result<ByteVec, M64Error> {
         let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
-        let mut sample_bytes: ByteVec = Input::samples_to_bytes(&self.inputs, &active_controllers);
+        let mut sample_bytes: ByteVec = Input::samples_to_bytes(&self.inputs, &active_controllers)?;
         let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
         buffer[0x0..0x4].copy_from_slice(&self.signature);
         buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());
@@ -217,9 +241,11 @@ impl M64File {
         buffer[0x222..0x300].copy_from_slice(&self.author.as_bytes());
         buffer[0x300..0x400].copy_from_slice(&self.movie_desc.as_bytes());
         buffer[0x400..].copy_from_slice(&sample_bytes);
-        buffer
+        Ok(buffer)
     }
 }
+
+
 
 
 
