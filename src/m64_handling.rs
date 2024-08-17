@@ -1,6 +1,6 @@
 use std::array::TryFromSliceError;
 use std::ascii::Char as AsciiChar;
-use std::ops::{Shr};
+use std::ops::{Range, Shr};
 use bitvec::prelude::BitArray;
 use bitvec::view::BitViewSized;
 
@@ -218,7 +218,7 @@ impl M64File {
 
     }
     pub fn to_bytes(&self) -> Result<ByteVec, M64Error> {
-        let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
+        let active_controllers = Self::active_controllers(self.controller_flags)?;
         let mut sample_bytes: ByteVec = Input::samples_to_bytes(&self.inputs, &active_controllers)?;
         let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
         buffer[0x0..0x4].copy_from_slice(&self.signature);
@@ -243,6 +243,14 @@ impl M64File {
         buffer[0x400..].copy_from_slice(&sample_bytes);
         Ok(buffer)
     }
+    pub fn remove_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File, M64Error> {
+        let active_controllers = Self::active_controllers(self.controller_flags)?;
+        for i in 0..active_controllers.len() {
+            (&mut self.inputs[active_controllers[i]]).drain(&range.start..&range.end);
+        }
+        Ok(self)
+    }
+
 }
 
 
