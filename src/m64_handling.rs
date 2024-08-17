@@ -4,7 +4,7 @@ use std::ops::{Shr};
 use bitvec::prelude::BitArray;
 use bitvec::view::BitViewSized;
 
-pub type ControllerInput = Vec<Input>;
+pub type Controllers = [Vec<Input>; 4];
 pub type ByteVec = Vec<u8>;
 
 pub struct M64File {
@@ -27,7 +27,7 @@ pub struct M64File {
     pub rsp_plugin: [AsciiChar; 64],        //0x1E2 64 bytes
     pub author: [AsciiChar; 222],           //0x222 220 bytes
     pub movie_desc: [AsciiChar; 256],       //0x300 256 bytes
-    pub inputs: [ControllerInput; 4],            //0x400
+    pub inputs: Controllers,            //0x400
 }
 
 pub struct Input {
@@ -70,8 +70,8 @@ impl Input {
             y: 0,
         }
     }
-    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> [ControllerInput; 4] {
-        let mut inputs: [ControllerInput; 4] = [const { Vec::new() }; 4];
+    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> Controllers {
+        let mut inputs: Controllers = [const { Vec::new() }; 4];
         let mut active_controllers = M64File::active_controllers(controller_flags as u32).expect("TODO: panic message");
         for i in (0..input_bytes.len()).step_by(4) {
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
@@ -98,7 +98,7 @@ impl Input {
         inputs
     }
 
-    pub(crate) fn samples_to_bytes(inputs: &[ControllerInput; 4], active_controllers: &Vec<usize>) -> ByteVec {
+    pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> ByteVec {
 
         let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
         let mut input_bytes: ByteVec = vec![0; size*4*active_controllers.len()];
