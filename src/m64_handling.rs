@@ -74,8 +74,9 @@ impl Input {
         let mut inputs: Controllers = [const { Vec::new() }; 4];
         let mut active_controllers = M64File::active_controllers(controller_flags as u32).expect("TODO: panic message");
         for i in (0..input_bytes.len()).step_by(4) {
+
             let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
-            let current_controller = active_controllers[i % active_controllers.len()];
+            let current_controller = active_controllers[(i/4) % active_controllers.len()];
             inputs[current_controller].push(Input {
                 r_dpad: (input & 0x01) != 0,
                 l_dpad: (input & 0x02) != 0,
@@ -101,7 +102,7 @@ impl Input {
     pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> ByteVec {
 
         let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
-        let mut input_bytes: ByteVec = vec![0; size*4*active_controllers.len()];
+        let mut input_bytes: ByteVec = vec![0; size*4];
         for i in 0..size {
             let current_controller = active_controllers[i % active_controllers.len()];
             let frame = i.div_floor(active_controllers.len());
@@ -193,9 +194,8 @@ impl M64File {
 
     }
     pub fn to_bytes(&self) -> ByteVec {
-        let inputs = &self.inputs;
         let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
-        let mut sample_bytes: ByteVec = Input::samples_to_bytes(inputs, &active_controllers);
+        let mut sample_bytes: ByteVec = Input::samples_to_bytes(&self.inputs, &active_controllers);
         let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
         buffer[0x0..0x4].copy_from_slice(&self.signature);
         buffer[0x4..0x8].copy_from_slice(&self.version.to_le_bytes());

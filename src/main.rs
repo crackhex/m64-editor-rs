@@ -5,15 +5,14 @@ extern crate core;
 mod m64_handling;
 mod file_handling;
 
-use std::io;
-use std::io::prelude::*;
+
 use std::path::Path;
 use crate::m64_handling::{M64File};
 use crate::file_handling::{read_file, save_file};
 
 
 
-pub fn main() -> io::Result<()>{
+pub fn main() -> std::io::Result<()>{
     let input_path = "Path\\to\\m64\\input.m64";
     let m64_input_path = Path::new(input_path);
     let output_path  ="Path\\to\\m64\\output.m64";
