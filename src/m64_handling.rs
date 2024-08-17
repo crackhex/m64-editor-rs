@@ -185,18 +185,15 @@ impl M64File {
 
     }
     pub fn active_controllers(controller_flags: u32) -> Option<Vec<usize>> {
-        let mut active_controllers: Vec<usize> = vec![];
-        let controllers: BitArray<u32>= controller_flags.into_bitarray();
-        for i in 0..4 {
-            if controllers[i] {
-                active_controllers.push(i);
-            }
-        };
-        Some(active_controllers)
+        // Returns a vector with the indices of the active controllers,
+        // e.g., if controller 1, 2, and 4 are enabled, it will return [1, 2, 4]
+        let mut controllers: BitArray<u32>= controller_flags.into_bitarray();
+        let active_controllers: Vec<usize> = (0..4).filter(|&i| controllers[i]).collect();
+        Option::from((!active_controllers.is_empty()).then_some(active_controllers))
+
     }
     pub fn to_bytes(&self) -> ByteVec {
         let inputs = &self.inputs;
-
         let active_controllers = Self::active_controllers(self.controller_flags).expect("TODO: panic message");
         let mut sample_bytes: ByteVec = Input::samples_to_bytes(inputs, &active_controllers);
         let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
