@@ -1,9 +1,10 @@
-use std::array::TryFromSliceError;
 use std::ascii::Char as AsciiChar;
+use std::fmt::{Display, Formatter};
 use std::ops::{Range, Shr};
 use bitvec::prelude::BitArray;
 use bitvec::view::BitViewSized;
 
+use anyhow::{Result};
 pub type Controllers = [Vec<Input>; 4];
 pub type ByteVec = Vec<u8>;
 
@@ -36,19 +37,24 @@ pub struct M64Error {
     message: String,
 }
 
-impl From<TryFromSliceError> for M64Error {
-    fn from(error: TryFromSliceError) -> Self {
-        M64Error {
-            message: error.to_string(),
-        }
-    }
-}
 
 impl From<std::io::Error> for M64Error {
     fn from(error: std::io::Error) -> Self {
         M64Error {
             message: error.to_string(),
         }
+    }
+}
+
+impl Display for M64Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl std::error::Error for M64Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 }
 
@@ -93,12 +99,12 @@ impl Input {
             y: 0,
         }
     }
-    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> Result<Controllers, M64Error> {
+    fn parse(input_bytes: &ByteVec, controller_flags: u8) -> Result<Controllers> {
         let mut inputs: Controllers = [const { Vec::new() }; 4];
         let mut active_controllers = M64File::active_controllers(controller_flags as u32)?;
         for i in (0..input_bytes.len()).step_by(4) {
 
-            let input = u32::from_le_bytes(input_bytes[i..i+4].try_into().unwrap());
+            let input = u32::from_le_bytes(input_bytes[i..i+4].try_into()?);
             let current_controller = active_controllers[(i/4) % active_controllers.len()];
             inputs[current_controller].push(Input {
                 r_dpad: (input & 0x01) != 0,
@@ -122,7 +128,7 @@ impl Input {
         Ok(inputs)
     }
 
-    pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> Result<ByteVec, M64Error> {
+    pub(crate) fn samples_to_bytes(inputs: &Controllers, active_controllers: &Vec<usize>) -> Result<ByteVec> {
 
         let size = inputs[0].len() + inputs[1].len() + inputs[2].len() + inputs[3].len();
         let mut input_bytes: ByteVec = vec![0; size*4];
@@ -178,9 +184,9 @@ impl M64File {
             inputs: [const { Vec::new() }; 4],
         }
     }
-    pub fn from_bytes(buf: &ByteVec) -> Result<M64File, M64Error> {
+    pub fn from_bytes(buf: &ByteVec) -> Result<M64File> {
         if buf.len() < 0x400 {
-            Err(M64Error { message: "File is too small".to_string() })?;
+            return Err(M64Error { message: "File is too small".to_string() }.into());
         }
         let m64 = M64File {
             signature: buf[0x0..0x4].try_into()?,
@@ -212,13 +218,14 @@ impl M64File {
         // Returns a vector with the indices of the active controllers,
         // e.g., if controller 1, 2, and 4 are enabled, it will return [1, 2, 4]
         let mut controllers: BitArray<u32>= controller_flags.into_bitarray();
-        let active_controllers: Vec<usize> = (0..4).filter(|&i| controllers[i]).collect();
+        let active_controllers: Vec<usize> = (0..4).filter(|&i| controllers[i]).collect::<Vec<_>>();
+
         Result::from((!active_controllers.is_empty()).
             then_some(active_controllers).
-            ok_or(M64Error { message: "No active controllers found".to_string() }))
+            ok_or(M64Error { message: "No active controllers".to_string() }))
 
     }
-    pub fn to_bytes(&self) -> Result<ByteVec, M64Error> {
+    pub fn to_bytes(&self) -> Result<ByteVec> {
         let active_controllers = Self::active_controllers(self.controller_flags)?;
         let mut sample_bytes: ByteVec = Input::samples_to_bytes(&self.inputs, &active_controllers)?;
         let mut buffer: ByteVec = vec![0; 0x400 + sample_bytes.len()];
@@ -244,14 +251,14 @@ impl M64File {
         buffer[0x400..].copy_from_slice(&sample_bytes);
         Ok(buffer)
     }
-    pub fn remove_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File, M64Error> {
+    pub fn remove_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File> {
         let active_controllers = Self::active_controllers(self.controller_flags)?;
         for i in 0..active_controllers.len() {
             (&mut self.inputs[active_controllers[i]]).drain(&range.start..&range.end);
         }
         Ok(self)
     }
-    pub fn add_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File, M64Error> {
+    pub fn add_inputs(&mut self, range: &Range<usize>) -> Result<&mut M64File> {
         let active_controllers = Self::active_controllers(self.controller_flags)?;
         for i in 0..active_controllers.len() {
             let inputs = &mut self.inputs[active_controllers[i]];
@@ -262,8 +269,3 @@ impl M64File {
         Ok(self)
     }
 }
-
-
-
-
-
