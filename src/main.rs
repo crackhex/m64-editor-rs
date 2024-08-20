@@ -3,14 +3,14 @@
 
 mod api;
 mod gui;
-use iced::{alignment::{Horizontal, Vertical},
-           widget::{Column, Container, Text},
-           Element, Font, Length, };
+use iced::alignment::{Horizontal, Vertical};
+use iced::widget::{Column, Container, Text};
+use iced::{Element, Font, Length, keyboard, keyboard::key, Task, widget, Subscription};
+use iced::event::{self, Event};
 use iced_aw::{TabLabel, Tabs};
 use gui::settings::{style_from_index, SettingsMessage, SettingsTab, TabBarPosition};
 use gui::counter::{CounterMessage, CounterTab};
 use crate::gui::replacement_tab::{ReplacementMessage, ReplacementTab};
-
 const HEADER_SIZE: u16 = 32;
 const TAB_PADDING: u16 = 16;
 const ICON_BYTES: &[u8] = include_bytes!("../fonts/icons.ttf");
@@ -35,14 +35,15 @@ impl From<Icon> for char {
 }
 
 fn main() -> iced::Result {
-    iced::application("Tabs example", TabBarExample::update, TabBarExample::view)
+    iced::application("Tabs example", M64Editor::update, M64Editor::view)
         .font(iced_aw::BOOTSTRAP_FONT_BYTES)
         .font(ICON_BYTES)
+        .subscription(M64Editor::subscription)
         .run()
 }
 
 #[derive(Default)]
-struct TabBarExample {
+struct M64Editor {
     active_tab: TabId,
     counter_tab: CounterTab,
     settings_tab: SettingsTab,
@@ -65,16 +66,35 @@ enum Message {
     Settings(SettingsMessage),
     Replacement(ReplacementMessage),
     TabClosed(TabId),
+    Event(Event),
 }
 
-impl TabBarExample {
-    fn update(&mut self, message: Message) {
+impl M64Editor {
+    fn subscription(&self) -> Subscription<Message> {
+        event::listen().map(Message::Event)
+    }
+    fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::TabSelected(selected) => self.active_tab = selected,
-            Message::Counter(message) => self.counter_tab.update(message),
-            Message::Settings(message) => self.settings_tab.update(message),
-            Message::TabClosed(id) => println!("Tab {:?} event hit", id),
-            Message::Replacement(message) => self.replacement_tab.update(message),
+            Message::Event(event) => match event {
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                                    key: keyboard::Key::Named(key::Named::Tab),
+                                    modifiers,
+                                    ..
+                                }) => {
+                    if modifiers.shift() {
+                        widget::focus_next()
+                    } else {
+                        widget::focus_next()
+                    }
+                }
+                _ => {Task::none()}
+            },
+
+            Message::TabSelected(selected) => {self.active_tab = selected; Task::none()},
+            Message::Counter(message) => {self.counter_tab.update(message); Task::none()},
+            Message::Settings(message) => {self.settings_tab.update(message); Task::none()},
+            Message::TabClosed(id) => {println!("Tab {:?} event hit", id); Task::none()},
+            Message::Replacement(message) => {self.replacement_tab.update(message); Task::none()},
         }
     }
 

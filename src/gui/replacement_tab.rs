@@ -1,6 +1,6 @@
 use crate::{Icon, Message, Tab};
-use iced::{widget::{Column, Container, Text}, Alignment, Element};
-use iced::widget::{Button, Row, TextInput};
+use iced::{Alignment, Element, Task};
+use iced::widget::{text_input, Button, Row, Column, Container, Text};
 use iced_aw::tab_bar::TabLabel;
 
 #[derive(Clone, Debug)]
@@ -41,49 +41,61 @@ impl ReplacementTab {
             replacement_end: String::new(),
         }
     }
-    pub fn update(&mut self, message: ReplacementMessage) {
+    pub fn update(&mut self, message: ReplacementMessage) -> Task<Message>{
+
         match message {
             ReplacementMessage::BaseFileSearch => {
                 self.base_m64 = rfd::FileDialog::new().pick_file()
                     .unwrap_or_else(|| "".parse().unwrap())
                     .to_str().unwrap_or_else(|| "")
                     .to_string();
+                Task::none()
             }
             ReplacementMessage::ReplacementFileSearch => {
                 self.replacement_m64 = rfd::FileDialog::new().pick_file()
                     .unwrap_or_else(|| "".parse().unwrap())
                     .to_str().unwrap_or_else(|| "")
                     .to_string();
+                Task::none()
             }
             ReplacementMessage::OutputFileSearch => {
                 self.output_m64 = rfd::FileDialog::new().pick_file()
                     .unwrap_or_else(|| "".parse().unwrap())
                     .to_str().unwrap_or_else(|| "")
                     .to_string();
+                Task::none()
             }
             ReplacementMessage::ReplaceFrames => {
                 // Replace frames
+                Task::none()
             }
             ReplacementMessage::BaseM64Changed(value) => {
-                self.base_m64 = value
+                self.base_m64 = value;
+                Task::none()
             }
             ReplacementMessage::ReplacementM64Changed(value) => {
-                self.replacement_m64 = value
+                self.replacement_m64 = value;
+                Task::none()
             }
             ReplacementMessage::OutputM64Changed(value) => {
-                self.output_m64 = value
+                self.output_m64 = value;
+                Task::none()
             }
             ReplacementMessage::BaseStartChanged(value) => {
-                self.base_start = value
+                self.base_start = value;
+                Task::none()
             }
             ReplacementMessage::BaseEndChanged(value) => {
-                self.base_end = value
+                self.base_end = value;
+                Task::none()
             }
             ReplacementMessage::ReplacementStartChanged(value) => {
-                self.replacement_start = value
+                self.replacement_start = value;
+                Task::none()
             }
             ReplacementMessage::ReplacementEndChanged(value) => {
-                self.replacement_end = value
+                self.replacement_end = value;
+                Task::none()
             }
         }
     }
@@ -102,7 +114,6 @@ impl Tab for ReplacementTab {
 
     fn content(&self) -> Element<'_, Self::Message> {
         let content: Element<'_, ReplacementMessage> = Container::new(
-
             Column::new()
                 .spacing(4)
                 .push(
@@ -110,7 +121,7 @@ impl Tab for ReplacementTab {
                         .align_y(Alignment::Start)
                         .spacing(10)
                         .push(Text::new("Input M64:")).align_y(Alignment::Center)
-                        .push(TextInput::new("Input M64", &self.base_m64)
+                        .push(text_input("Input M64", &self.base_m64)
                             .on_input(ReplacementMessage::BaseM64Changed).padding(2).width(275))
                         .push(Button::new(Text::new("Find")
                             .align_x(Alignment::Center).align_y(Alignment::Center))
@@ -120,7 +131,7 @@ impl Tab for ReplacementTab {
                     Row::new()
                         .spacing(10)
                         .push(Text::new("Replacement M64:")).align_y(Alignment::Center)
-                        .push(TextInput::new("Replacement M64", &self.replacement_m64)
+                        .push(text_input("Replacement M64", &self.replacement_m64)
                             .on_input(ReplacementMessage::ReplacementM64Changed).padding(2).width(275))
                         .push(Button::new(Text::new("Find")
                             .align_x(Alignment::Center).align_y(Alignment::Center))
@@ -130,7 +141,7 @@ impl Tab for ReplacementTab {
                     Row::new()
                         .spacing(10)
                         .push(Text::new("Output M64:")).align_y(Alignment::Center)
-                        .push(TextInput::new("Output M64", &self.output_m64)
+                        .push(text_input("Output M64", &self.output_m64)
                             .on_input(ReplacementMessage::OutputM64Changed).padding(2).width(275))
                         .push(Button::new(Text::new("Find")
                             .align_x(Alignment::Center).align_y(Alignment::Center))
@@ -142,7 +153,7 @@ impl Tab for ReplacementTab {
                     Row::new()
                         .spacing(10)
                         .push(Text::new("Start frame:")).align_y(Alignment::Center)
-                        .push(TextInput::new("", &self.base_start.to_string())
+                        .push(text_input("", &self.base_start.to_string())
                             .on_input(|value| {
                                 ReplacementMessage::BaseStartChanged(match value.parse::<u32>() {
                                     Ok(value) => value.to_string(),
@@ -150,10 +161,11 @@ impl Tab for ReplacementTab {
                                         if value != "" { self.base_start.to_string() }
                                         else { "".to_string() }
                                 })
+
                             }).padding(2).width(50))
                         .push(Text::new("").width(70))  // This is a hack to make the text input align with the button
                         .push(Text::new("End frame:")).align_y(Alignment::Center)
-                        .push(TextInput::new("", &self.base_end.to_string())
+                        .push(text_input("", &self.base_end.to_string())
                             .on_input(|value| {
                                 ReplacementMessage::BaseEndChanged(match value.parse::<u32>() {
                                     Ok(value) => value.to_string(),
@@ -170,7 +182,7 @@ impl Tab for ReplacementTab {
                     Row::new()
                         .spacing(10)
                         .push(Text::new("Start frame:")).align_y(Alignment::Center)
-                        .push(TextInput::new("", &self.replacement_start.to_string())
+                        .push(text_input("", &self.replacement_start.to_string())
                             .on_input(|value| {
                                 ReplacementMessage::ReplacementStartChanged(match value.parse::<u32>() {
                                     Ok(value) => value.to_string(),
@@ -181,7 +193,7 @@ impl Tab for ReplacementTab {
                             }).padding(2).width(50))
                         .push(Text::new("").width(70))  // This is a hack to make the text input align with the button
                         .push(Text::new("End frame:")).align_y(Alignment::Center)
-                        .push(TextInput::new("", &self.replacement_end.to_string())
+                        .push(text_input("", &self.replacement_end.to_string())
                             .on_input(|value| {
                                 ReplacementMessage::ReplacementEndChanged(match value.parse::<u32>() {
                                     Ok(value) => value.to_string(),
@@ -197,7 +209,6 @@ impl Tab for ReplacementTab {
                     Button::new(Text::new("Replace frames"))
                         .on_press(ReplacementMessage::ReplaceFrames)
                 )
-
         ).align_x(iced::alignment::Horizontal::Right)
         .into();
         content.map(Message::Replacement)

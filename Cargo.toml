@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced.git", features = ["image", "debug"] }
+iced = { git = "https://github.com/iced-rs/iced.git", features = ["image", "debug", "advanced"] }
 iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = ["tabs", "icons"] }
 tokio = {version = "1.39.3", features = ["fs"]}
 bitvec = "1.0.1"
