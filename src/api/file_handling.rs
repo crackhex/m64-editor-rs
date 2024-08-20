@@ -2,7 +2,7 @@ use std::io;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
-use crate::m64_handling::ByteVec;
+use crate::api::m64_handling::ByteVec;
 
 pub fn read_file(path: &Path) -> io::Result<ByteVec> {
 

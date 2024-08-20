@@ -3,8 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::ops::{Range, Shr};
 use bitvec::prelude::BitArray;
 use bitvec::view::BitViewSized;
-
 use anyhow::{Result};
+
 pub type Controllers = [Vec<Input>; 4];
 pub type ByteVec = Vec<u8>;
 
