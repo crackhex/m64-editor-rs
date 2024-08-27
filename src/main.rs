@@ -2,13 +2,19 @@
 #![feature(int_roundings)]
 #![windows_subsystem = "windows"]
 
-
+use crate::delegate::Delegate;
 use druid::widget::prelude::*;
-use druid::widget::{Align, Axis, Button, Controller, CrossAxisAlignment, Flex, Label, Tabs, TabsEdge, TabsPolicy, TabsTransition, TextBox, ViewSwitcher};
-use druid::{AppDelegate, AppLauncher, Data, HotKey, KeyEvent, Lens, RawMods, SysMods, UnitPoint, Widget, WidgetExt, WindowDesc};
+use druid::widget::{Align, Axis, Button, Controller, CrossAxisAlignment, Flex,
+                    Label, Tabs, TabsEdge, TabsPolicy, TabsTransition, TextBox, ViewSwitcher};
+use druid::{AppDelegate, AppLauncher, Data, Lens, Selector, UnitPoint, Widget, WidgetExt, WindowDesc};
 use std::any::Any;
 
 mod api;
+mod delegate;
+
+pub const OPEN_FILE: Selector = Selector::new("app.open-file");
+pub const SAVE_FILE: Selector = Selector::new("app.save-file");
+pub const QUIT_APP: Selector = Selector::new("app.quit-app");
 
 #[derive(Data, Clone, Lens)]
 struct TabConfig {
@@ -205,6 +211,7 @@ pub fn main() {
     let launcher = AppLauncher::with_window(main_window);
     launcher
         .log_to_console()
+        .delegate(Delegate::new())
         .launch(initial_state)
         .expect("Failed to launch application");
 }
