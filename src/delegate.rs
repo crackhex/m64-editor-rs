@@ -14,13 +14,6 @@ impl Delegate {
         }
     }
 
-    pub fn with_main(main_window: WindowId) -> Self {
-        let mut this = Self::new();
-        this.main_window.replace(main_window);
-        this
-    }
-
-
     fn show_main(&mut self, ctx: &mut DelegateCtx) {
         match self.main_window {
             Some(id) => {
@@ -85,18 +78,5 @@ impl AppDelegate<AppState> for Delegate {
         }
         Handled::No
 
-    }
-
-    fn window_removed(
-        &mut self,
-        id: WindowId,
-        _data: &mut AppState,
-        _env: &Env,
-        ctx: &mut DelegateCtx,
-    ) {
-        if self.main_window == Some(id) {
-            ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
-            ctx.submit_command(commands::QUIT_APP);
-        }
     }
 }
