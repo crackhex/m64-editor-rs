@@ -4,6 +4,11 @@ use std::io::{Read, Write};
 use std::path::Path;
 use crate::api::m64_handling::ByteVec;
 
+#[derive(Debug, Clone)]
+pub enum DialogError {
+    DialogClosed,
+    IoError(io::ErrorKind),
+}
 pub fn read_file(path: &Path) -> io::Result<ByteVec> {
 
     let mut file = File::open(path)?;

@@ -6,10 +6,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-iced = { git = "https://github.com/iced-rs/iced.git", features = ["image", "debug", "advanced"] }
-iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", features = ["tabs", "icons"] }
-tokio = {version = "1.39.3", features = ["fs"]}
+druid = {git="https://github.com/linebender/druid.git", features=["im"]}
+tracing = "0.1.40"
+instant = { version = "0.1.13", features = ["wasm-bindgen"] }
 bitvec = "1.0.1"
-anyhow = "1.0.8"
-tracing-subscriber = "0.3.18"
 rfd = "0.14.1"
+anyhow = "1"
