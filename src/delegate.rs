@@ -1,7 +1,7 @@
+use crate::{AppState, OPEN_FILE, SET_OUTPUT_TEXT};
 use druid::{commands, AppDelegate, Command, DelegateCtx, Env, Event, Handled, LensExt, Target, WindowId};
-use druid_shell::{HotKey, KbKey};
 use druid_shell::RawMods::Ctrl;
-use crate::{AppState, OPEN_FILE};
+use druid_shell::{HotKey, KbKey};
 
 pub struct Delegate {
     main_window: Option<WindowId>,
@@ -30,6 +30,29 @@ impl Delegate {
         self.main_window = None;
     }
 
+}
+
+impl AppDelegate<String> for Delegate {
+    fn command(
+        &mut self,
+        ctx: &mut DelegateCtx,
+        _target: Target,
+        cmd: &Command,
+        _data: &mut String,
+        _env: &Env,
+    ) -> Handled {
+        if let Some(_) = cmd.get(SET_OUTPUT_TEXT) {
+            println!("Show window");
+            self.show_main(ctx);
+            return Handled::Yes;
+        }
+        if let Some(_) = cmd.get(commands::CLOSE_ALL_WINDOWS) {
+            println!("Show window");
+            self.close_all_windows(ctx);
+            return Handled::Yes;
+        }
+        Handled::No
+    }
 }
 
 impl AppDelegate<AppState> for Delegate {
@@ -63,9 +86,13 @@ impl AppDelegate<AppState> for Delegate {
         ctx: &mut DelegateCtx,
         _target: Target,
         cmd: &Command,
-        _data: &mut AppState,
+        data: &mut AppState,
         _env: &Env,
     ) -> Handled {
+        if let Some(info) = cmd.get(SET_OUTPUT_TEXT) {
+            data.output_m64 = info.path().to_str().unwrap().to_string();
+            return Handled::Yes;
+        }
         if let Some(_) = cmd.get(commands::SHOW_WINDOW) {
             println!("Show window");
             self.show_main(ctx);

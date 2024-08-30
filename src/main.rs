@@ -6,13 +6,15 @@ use crate::delegate::Delegate;
 use druid::widget::prelude::*;
 use druid::widget::{Align, Axis, Button, Controller, CrossAxisAlignment, Flex,
                     Label, Tabs, TabsEdge, TabsPolicy, TabsTransition, TextBox, ViewSwitcher};
-use druid::{AppDelegate, AppLauncher, Data, Lens, Selector, UnitPoint, Widget, WidgetExt, WindowDesc};
+use druid::{AppDelegate, AppLauncher, Data, FileDialogOptions, Lens, Selector, UnitPoint, Widget, WidgetExt, WindowDesc};
 use std::any::Any;
+use druid_shell::FileSpec;
 
 mod api;
 mod delegate;
 
 pub const OPEN_FILE: Selector = Selector::new("app.open-file");
+pub const SET_OUTPUT_TEXT: Selector<druid_shell::FileInfo> = Selector::new("app.set-output-text");
 pub const SAVE_FILE: Selector = Selector::new("app.save-file");
 pub const QUIT_APP: Selector = Selector::new("app.quit-app");
 
@@ -68,6 +70,15 @@ fn build_tab_widget(tab_config: &TabConfig) -> impl Widget<AppState> {
                              .with_child(Label::new("Rename tab:")), 1.0)
         .with_child(TextBox::new().lens(AppState::first_tab_name));
 
+    let m64_spec = FileSpec::new("M64 files", &["m64"]);
+    let save_dialog_options = FileDialogOptions::new()
+        .accept_command(druid::commands::OPEN_FILE)
+        .allowed_types(vec![m64_spec])
+        .default_type(m64_spec)
+        .default_name("output.m64".to_string())
+        .name_label("Target")
+        .title("Choose a target for this lovely file")
+        .button_text("Export");
     let replacement_tab = {
         let input_m64_row = Flex::row()
             .with_child(
@@ -131,14 +142,17 @@ fn build_tab_widget(tab_config: &TabConfig) -> impl Widget<AppState> {
             .with_flex_child(
                 TextBox::new()
                     .fix_width(300.0)
+                    .scroll()
                     .lens(AppState::output_m64),
                 1.0)
             .with_spacer(10.0)
             .with_child(
                 Button::new("...")
                     .fix_height(26.0)
-                    .on_click(|ctx, data: &mut AppState, _| {
-                        data.output_m64 = data.input_m64.clone();
+
+                    .on_click(move |ctx, data: &mut AppState, _| {
+                        ctx.submit_command(druid::commands::SHOW_SAVE_PANEL.with(save_dialog_options.clone().accept_command(SET_OUTPUT_TEXT)))
+
                     })
             );
         let m64_col = Flex::column()
