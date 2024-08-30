@@ -45,7 +45,7 @@ impl AppDelegate<AppState> for Delegate {
         if let Event::KeyDown(key_event) = &event {
             println!("Key down: {:?}", key_event.key);
             if key_event.key == KbKey::Escape {
-                ctx.submit_command(commands::QUIT_APP);
+                ctx.submit_command(commands::CLOSE_ALL_WINDOWS);
                 return None;
             }
             let open_file = HotKey::new(Ctrl, KbKey::Character("o".to_string()));

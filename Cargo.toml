@@ -1,13 +1,13 @@
-
+cargo-features = ["edition2024"]
 
 [package]
 name = "m64_editor"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
-druid = {version="0.8.3", features=["im", "raw-win-handle"]}
-druid-shell = {version="0.8.3"}
+druid = {git = "https://github.com/linebender/druid.git", features=["im"]}
+druid-shell = { git= "https://github.com/linebender/druid.git" , features=["im"]}
 tracing = "0.1.40"
 instant = { version = "0.1.13", features = ["wasm-bindgen"] }
 bitvec = "1.0.1"
